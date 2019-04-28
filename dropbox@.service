@@ -1,0 +1,32 @@
+[Unit]
+Description=Dropbox client (user: %i)
+Requires=docker.service
+After=docker.service
+ 
+[Service]
+Type=simple
+Environment=DBOX_HOME=/home/dbox
+
+# check user existence
+ExecStartPre=/bin/bash -c "id %i > /dev/null 2>&1 || (echo '[ERROR] User not found. : %i'; exit 1; )"
+ExecStartPre=/bin/bash -c "if [[ ! -d /home/%i ]]; then echo '[ERROR] Directory not found. : /home/%i'; exit 1; fi"
+
+# prepare user's uid & gid
+ExecStartPre=/bin/bash -c "echo USER_ID=`id %i | sed -re 's/.*uid=([0-9]+).*/\1/'` > /tmp/dropbox_%i"
+ExecStartPre=/bin/bash -c "echo GROUP_ID=`id %i | sed -re 's/.*uid=([0-9]+).*/\1/'` >> /tmp/dropbox_%i"
+
+# make dropbox directory
+ExecStartPre=/bin/bash -c "[[ -d /home/%i/Dropbox ]] || (mkdir /home/%i/Dropbox; chown %i:%i /home/%i/Dropbox;)"
+ExecStartPre=/bin/bash -c "[[ -d /home/%i/.dropbox ]] || (mkdir /home/%i/.dropbox; chown %i:%i /home/%i/.dropbox;)"
+
+# stop & remove existence container
+ExecStartPre=/bin/bash -c "/usr/bin/docker container ls -q -f name=dropbox_%i | xargs -r docker stop"
+ExecStartPre=/bin/bash -c "/usr/bin/docker ps -a -q -f name=dropbox_%i | xargs -r docker rm"
+
+ExecStart=/usr/bin/docker run --rm --name=dropbox_%i --env-file /tmp/dropbox_%i -v /home/%i/Dropbox:${DBOX_HOME}/Dropbox -v /home/%i/.dropbox:${DBOX_HOME}/.dropbox -v /etc/localtime:/etc/localtime:ro littlef/dropbox
+
+ExecStop=/usr/bin/docker stop dropbox_%i
+
+[Install]
+WantedBy=multi-user.target
+

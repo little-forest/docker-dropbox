@@ -1,0 +1,30 @@
+#!/bin/sh
+#---------------------------------------------------------------------
+# dropbox-cli support script
+#---------------------------------------------------------------------
+# Usage from host :
+#  $ docker exec -it <CONTAINER_NAME> /dropbox <command>
+#
+#  for more details
+#
+#  $ docker exec -it <CONTAINER_NAME> /dropbox help
+#
+
+DBOX_USER=dbox
+DBOX_HOME=/home/${DBOX_USER}
+
+if [ $1 = running-status ]; then
+  PID_FILE=${DBOX_HOME}/.dropbox/dropbox.pid
+  if [ -f $PID_FILE ]; then
+    DBOX_PID=`cat ${DBOX_HOME}/.dropbox/dropbox.pid`
+    if [ -n "$DBOX_PID" ]; then
+      cat /proc/${DBOX_PID}/cmdline | grep -q '/dropbox'
+      exit $?
+    fi
+  fi
+  exit 1
+fi
+
+su-exec ${DBOX_USER} ${DBOX_HOME}/bin/dropbox.py $@
+exit $?
+
