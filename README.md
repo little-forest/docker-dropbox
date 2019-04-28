@@ -1,10 +1,18 @@
 # Dropbox client in Docker with systemd unit
 
+Dropbox client docker image that has the following futures.
+
+* Supports any UID/GID.
+* Can use cli client(dropbox.py) from host.
+* Provides systemd unit file, so you can operate dropbox easily on CentOS7.
+
 ## Quick start
 
 ```shell-session
 $ mkdir ~/Dropbox ~/.dropbox
 # docker run --rm --name=dropbox \
+    -e USER_ID=1000 \
+    -e GROUP_ID=1000 \
     -v ~/Dropbox:/home/dbox/Dropbox \
     -v ~/.dropbox:/home/dbox/.dropbox \
     -v /etc/localtime:/etc/localtime:ro \
@@ -71,7 +79,7 @@ Filesystem     Type 1K-blocks    Used Available Use% Mounted on
 /dev/loop2     ext4  10190100 7964172   1685256  83% /home/bob/Dropbox
 ```
 
-`/etc/systemd/system/home-bob-Dropbox.mount`
+For systemd mount unit, create `/etc/systemd/system/home-bob-Dropbox.mount` as follows.
 
 ```
 [Unit]
@@ -89,6 +97,8 @@ TimeoutSec=30
 [Install]
 WantedBy=multi-user.target
 ```
+
+Mount using mount unit file.
 
 ```shell-session
 $ sudo systemctl daemon-reload
