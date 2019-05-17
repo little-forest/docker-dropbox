@@ -25,7 +25,7 @@ ExecStartPre=/bin/bash -c "[[ -d /home/%i/.dropbox ]] || (mkdir /home/%i/.dropbo
 ExecStartPre=/bin/bash -c "/usr/bin/docker container ls -q -f name=dropbox_%i | xargs -r docker stop"
 ExecStartPre=/bin/bash -c "/usr/bin/docker ps -a -q -f name=dropbox_%i | xargs -r docker rm"
 
-ExecStart=/usr/bin/docker run --name=dropbox_%i --env-file /tmp/dropbox_%i --restart=unless-stopped -v /home/%i/Dropbox:${DBOX_HOME}/Dropbox -v /home/%i/.dropbox:${DBOX_HOME}/.dropbox -v /etc/localtime:/etc/localtime:ro littlef/dropbox
+ExecStart=/usr/bin/docker run --rm --name=dropbox_%i --env-file /tmp/dropbox_%i --restart=unless-stopped -v /home/%i/Dropbox:${DBOX_HOME}/Dropbox -v /home/%i/.dropbox:${DBOX_HOME}/.dropbox -v /etc/localtime:/etc/localtime:ro littlef/dropbox
 
 ExecStop=/usr/bin/docker exec dropbox_%i /dropbox stop
 
