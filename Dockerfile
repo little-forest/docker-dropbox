@@ -17,12 +17,14 @@ RUN apk update && apk add --no-cache ca-certificates wget glib libstdc++ su-exec
     && cd /home/${DBOX_USER} && wget -O - "https://www.dropbox.com/download?plat=lnx.x86_64" | tar xzf - \
     && echo "Installed Dropbox version:" $(cat /home/${DBOX_USER}/.dropbox-dist/VERSION)
 
-COPY entrypoint.sh /
 COPY dropbox /
+COPY entrypoint.sh /
 
 EXPOSE 17500
 
 VOLUME ["/home/${DBOX_USER}/Dropbox", "/home/${DBOX_USER}/.dropbox"]
+
+#HEALTHCHECK --interval=1m --timeout=10s --retries=1 CMD /dropbox running-status
 
 ENTRYPOINT ["/entrypoint.sh"]
 
