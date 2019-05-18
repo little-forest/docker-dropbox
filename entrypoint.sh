@@ -14,25 +14,37 @@ C_OFF="\e[m"
 
 fatal() {
   echo -e "${C_RED}[FATAL] $1${C_OFF}" >&2
-  exit 1
+  # prevent for restart by docker/systemd, exit status must be 0
+  exit 0
 }
 
 warning() {
   echo -e "${C_YELLOW}[WARNING] $1${C_OFF}" >&2
-  exit 1
 }
 
+handle_sigterm() {
+  dropbox_stop SIGTERM
+}
+trap 'handle_sigterm' SIGTERM
+
+handle_sigkill() {
+  dropbox_stop SIGKILL
+}
+trap 'handle_sigterm' SIGKILL
+
+
 dropbox_stop() {
+  echo -e "${C_CYAN}Received $1${C_OFF}"
   echo -e "${C_CYAN}Terminating Dropbox daemon...${C_OFF}"
+
   su-exec ${USER_NAME} ${USER_HOME}/bin/dropbox.py stop
   while :; do
     sleep 1
     ps | awk '{print $1}' | grep -qE "^[ \t]*${DROPBOX_PID}$" || break;
   done
-  echo -e "${C_CYAN}Dropbox daemon terminated.${C_OFF}"
+  echo -e "${C_CYAN}Dropbox daemon normally terminated.${C_OFF}"
+  exit 0
 }
-trap 'dropbox_stop' EXIT
-
 
 #---------------------------------------------------------------------
 # Main Process
@@ -47,21 +59,18 @@ USER_NAME=${DBOX_USER}
 GROUP_NAME=${USER_NAME}
 USER_HOME=/home/${USER_NAME}
 
-VERSION=`cat ${USER_HOME}/.dropbox-dist/VERSION`
-
 echo '--------------------------------------------------------------------------------'
-echo -e "${C_CYAN}Dropbox version : $VERSION${C_OFF}"
-echo -e "${C_CYAN}Starting dropboxd with UID : ${USER_ID}, GID: ${GROUP_ID}${C_OFF}"
+echo -e "${C_CYAN}Starting Docker-Dropbox with UID : ${USER_ID}, GID: ${GROUP_ID}${C_OFF}"
 
 # Change UID & GID
 groupmod -g ${GROUP_ID} ${GROUP_NAME}
 usermod -g ${GROUP_ID} -u ${USER_ID} ${USER_NAME}
-chown ${USER_NAME}:${GROUP_NAME} ${USER_HOME} ${USER_HOME}/bin ${USER_HOME}/.dropbox-dist
+chown ${USER_NAME}:${GROUP_NAME} ${USER_HOME} ${USER_HOME}/bin
 
 # Create group and user
 export HOME=${USER_HOME}
 
-# Check filesystem
+# Check the filesystem
 FILESYSTEM=`df -T ${USER_HOME}/Dropbox/ | tail -n1 | awk '{print $2}'`
 if [ "$FILESYSTEM" != ext4 ]; then
   fatal "Dropbox supports filesystem only ext4. (${USER_HOME}/Dropbox/ is ${FILESYSTEM}"
@@ -71,8 +80,9 @@ fi
 PID_FILE=${USER_HOME}/.dropbox/dropbox.pid
 [ -f ${PID_FILE} ] && rm ${PID_FILE}
 
-# Execute Dropbox daemon
-su-exec ${USER_NAME} ${USER_HOME}/bin/dropbox.py start
+# Download and execute Dropbox daemon
+echo -e "${C_CYAN}Starting dropbox daemon${C_OFF}"
+echo 'y' | su-exec ${USER_NAME} ${USER_HOME}/bin/dropbox.py start -i
 
 # Check Dropbox daemon's pid
 while :; do
@@ -81,13 +91,14 @@ while :; do
   if [ -f ${PID_FILE} ]; then
     DROPBOX_PID=`cat ${PID_FILE}`
     echo -e "${C_GREEN}Dropbox daemon detected. pid:${DROPBOX_PID}${C_OFF}"
+    su-exec ${USER_NAME} ${USER_HOME}/bin/dropbox.py version
     break
   fi
 done
 
 # set lansync
 if su-exec ${USER_NAME} ${USER_HOME}/bin/dropbox.py lansync ${LANSYNC}; then
-  echo -e "${C_GREEN}Set lancync mode to ${LANSYNC}${C_OFF}"
+  echo -e "${C_GREEN}Set lancync mode to '${LANSYNC}${C_OFF}'"
 fi
 
 # Wait to terminate
@@ -95,6 +106,7 @@ while :; do
   sleep 5
   ps | awk '{print $1}' | grep -qE "^[ \t]*${DROPBOX_PID}$" || break;
 done
-echo -e "${C_WHITE}Dropbox daemon terminated.${C_OFF}"
+echo -e "${C_RED}Detected Dropbox daemon abnormally terminated.${C_OFF}"
+exit 1
 
 # vim: ts=2 sw=2 sts=2 et nu foldmethod=marker

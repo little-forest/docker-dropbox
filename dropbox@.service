@@ -6,8 +6,9 @@ After=docker.service
 [Service]
 Type=simple
 Environment=DBOX_HOME=/home/dbox
-Restart=on-abnormal
-RestartSec=10s
+KillMode=process
+Restart=on-failure
+RestartSec=5s
 
 # check user existence
 ExecStartPre=/bin/bash -c "id %i > /dev/null 2>&1 || (echo '[ERROR] User not found. : %i'; exit 1; )"
