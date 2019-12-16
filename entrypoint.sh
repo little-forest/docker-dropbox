@@ -71,23 +71,39 @@ chown ${USER_NAME}:${GROUP_NAME} ${USER_HOME} ${USER_HOME}/bin
 export HOME=${USER_HOME}
 
 # Check the filesystem
-FILESYSTEM=`df -T ${USER_HOME}/Dropbox/ | tail -n1 | awk '{print $2}'`
-if [ "$FILESYSTEM" != ext4 ]; then
-  fatal "Dropbox supports filesystem only ext4. (${USER_HOME}/Dropbox/ is ${FILESYSTEM}"
-fi
+#FILESYSTEM=`df -T ${USER_HOME}/Dropbox/ | tail -n1 | awk '{print $2}'`
+#if [ "$FILESYSTEM" != ext4 ]; then
+#  fatal "Dropbox supports filesystem only ext4. (${USER_HOME}/Dropbox/ is ${FILESYSTEM}"
+#fi
 
 # Delete old pid file
 PID_FILE=${USER_HOME}/.dropbox/dropbox.pid
 [ -f ${PID_FILE} ] && rm ${PID_FILE}
 
-# Download and execute Dropbox daemon
+# Download Dropbox daemon
+echo -e "${C_CYAN}Downloading Dropbox...${C_OFF}"
+( cd ${USER_HOME} && wget -q -O - "https://www.dropbox.com/download?plat=lnx.x86_64" | tar xzf - )
+if [ -d ${USER_HOME}/.dropbox-dist ]; then
+  echo -e "${C_CYAN}Dropbox version is `cat ${USER_HOME}/.dropbox-dist/VERSION`${C_OFF}"
+else
+  fatal "Unable to download dropboxd"
+fi
+
+( cd ${USER_HOME}/bin && wget -q -O dropbox.py "https://www.dropbox.com/download?dl=packages/dropbox.py" )
+if [ -f ${USER_HOME}/bin/dropbox.py ]; then
+  chmod +x ${USER_HOME}/bin/dropbox.py
+else
+  fatal "Unable to download dropbox.py"
+fi
+
+## Execute Dropbox daemon
 echo -e "${C_CYAN}Starting dropbox daemon${C_OFF}"
-echo 'y' | su-exec ${USER_NAME} ${USER_HOME}/bin/dropbox.py start -i
+su-exec ${USER_NAME} ${USER_HOME}/.dropbox-dist/dropboxd &
 
 # Check Dropbox daemon's pid
-while :; do
-  echo -e "${C_WHITE}Wating for Dropbox daemon to be ready...${C_OFF}"
-  sleep 1
+for T in 1 1 2 3 5 8 13 21 34 55; do
+  echo -e "${C_WHITE}Wating for Dropbox daemon to be ready $T seconds...${C_OFF}"
+  sleep $T
   if [ -f ${PID_FILE} ]; then
     DROPBOX_PID=`cat ${PID_FILE}`
     echo -e "${C_GREEN}Dropbox daemon detected. pid:${DROPBOX_PID}${C_OFF}"
@@ -95,6 +111,9 @@ while :; do
     break
   fi
 done
+if [ -z "${DROPBOX_PID}" ]; then
+  fatal "Unable to detect Dropbox daemon."
+fi
 
 # set lansync
 if su-exec ${USER_NAME} ${USER_HOME}/bin/dropbox.py lansync ${LANSYNC}; then
