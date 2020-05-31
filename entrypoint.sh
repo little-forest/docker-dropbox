@@ -1,5 +1,13 @@
 #!/bin/sh
 
+DAEMON_VERSION=86.4.146
+CLI_VERSION=2019.02.14
+
+PREFERRED_DROPBOX_FILE=dropbox-lnx.x86_64-${DAEMON_VERSION}.tar.gz
+DROPBOX_DOWNLOAD_URL="https://clientupdates.dropboxstatic.com/dbx-releng/client/${PREFERRED_DROPBOX_FILE}"
+DROPBOX_LATEST_DOWNLOAD_URL="https://www.dropbox.com/download?plat=lnx.x86_64"
+DROPBOX_CLI_LATEST_URL="https://www.dropbox.com/download?dl=packages/dropbox.py"
+
 LANSYNC=n
 
 #---------------------------------------------------------------------
@@ -58,9 +66,11 @@ dropbox_stop() {
 USER_NAME=${DBOX_USER}
 GROUP_NAME=${USER_NAME}
 USER_HOME=/home/${USER_NAME}
+DROPBOX_ARCHIVE=${USER_HOME}/.dropbox/archive
 
 echo '--------------------------------------------------------------------------------'
 echo -e "${C_CYAN}Starting Docker-Dropbox with UID : ${USER_ID}, GID: ${GROUP_ID}${C_OFF}"
+echo -e "Prefered version : ${PREFERRED_DROPBOX_FILE} / ${CLI_VERSION}"
 
 # Change UID & GID
 groupmod -g ${GROUP_ID} ${GROUP_NAME}
@@ -81,24 +91,53 @@ PID_FILE=${USER_HOME}/.dropbox/dropbox.pid
 [ -f ${PID_FILE} ] && rm ${PID_FILE}
 
 # Download Dropbox daemon
-echo -e "${C_CYAN}Downloading Dropbox...${C_OFF}"
-( cd ${USER_HOME} && wget -q -O - "https://www.dropbox.com/download?plat=lnx.x86_64" | tar xzf - )
+[ ! -d "${DROPBOX_ARCHIVE}" ] && mkdir -p ${DROPBOX_ARCHIVE}
+DROPBOX_ARCHIVE_PATH=${DROPBOX_ARCHIVE}/${PREFERRED_DROPBOX_FILE}
+if [ -f "${DROPBOX_ARCHIVE_PATH}" ]; then
+  # restore
+  echo -e "${C_CYAN}Restore Dropbox from ${DROPBOX_ARCHIVE_PATH} ...${C_OFF}"
+else
+  # download
+  if [ -n "${DROPBOX_DOWNLOAD_URL}" ]; then
+    DL_URL="${DROPBOX_DOWNLOAD_URL}"
+  else
+    DL_URL=`curl -I -Ls -o /dev/null -w %{url_effective} ${DROPBOX_LATEST_DOWNLOAD_URL}`
+  fi
+  echo -e "${C_CYAN}Downloading Dropbox from ${DL_URL} ...${C_OFF}"
+  (cd ${DROPBOX_ARCHIVE} && curl -Ls -O "${DL_URL}")
+  DROPBOX_ARCHIVE_PATH=${DROPBOX_ARCHIVE}/`basename ${DL_URL}`
+fi
+
+# Unarchive dropboxd
+tar -C ${USER_HOME} -zxf ${DROPBOX_ARCHIVE_PATH}
 if [ -d ${USER_HOME}/.dropbox-dist ]; then
   echo -e "${C_CYAN}Dropbox version is `cat ${USER_HOME}/.dropbox-dist/VERSION`${C_OFF}"
 else
   fatal "Unable to download dropboxd"
 fi
 
-( cd ${USER_HOME}/bin && wget -q -O dropbox.py "https://www.dropbox.com/download?dl=packages/dropbox.py" )
-if [ -f ${USER_HOME}/bin/dropbox.py ]; then
-  chmod +x ${USER_HOME}/bin/dropbox.py
+# Prepare dropbox.py (dropbox cli)
+DROPBOX_CLI=${USER_HOME}/bin/dropbox.py
+if [ -f "${DROPBOX_ARCHIVE}/dropbox.${CLI_VERSION}.py" ]; then
+  # restore archived cli
+  echo -e "${C_CYAN}Restore archived dropbox cli...${C_OFF}"
+  cp -pfv "${DROPBOX_ARCHIVE}/dropbox.${CLI_VERSION}.py" "${DROPBOX_CLI}"
 else
-  fatal "Unable to download dropbox.py"
+  # download latest cli
+  echo -e "${C_CYAN}Download dropbox cli from ${DROPBOX_CLI_LATEST_URL} ...${C_OFF}"
+  ( cd ${USER_HOME}/bin && curl -Ls -o dropbox.py "${DROPBOX_CLI_LATEST_URL}" )
+  if [ -f ${DROPBOX_CLI} ]; then
+    chmod +x ${DROPBOX_CLI}
+  else
+    fatal "Unable to download dropbox.py"
+  fi
 fi
+chown -R ${USER_ID}:${GROUP_ID} ${DROPBOX_ARCHIVE}
 
 ## Execute Dropbox daemon
 echo -e "${C_CYAN}Starting dropbox daemon${C_OFF}"
 su-exec ${USER_NAME} ${USER_HOME}/.dropbox-dist/dropboxd &
+sleep 3
 
 # Check Dropbox daemon's pid
 for T in 1 1 2 3 5 8 13 21 34 55; do
@@ -107,7 +146,10 @@ for T in 1 1 2 3 5 8 13 21 34 55; do
   if [ -f ${PID_FILE} ]; then
     DROPBOX_PID=`cat ${PID_FILE}`
     echo -e "${C_GREEN}Dropbox daemon detected. pid:${DROPBOX_PID}${C_OFF}"
-    su-exec ${USER_NAME} ${USER_HOME}/bin/dropbox.py version
+    su-exec ${USER_NAME} ${DROPBOX_CLI} version
+    CUR_CLI_VERSION=`su-exec ${USER_NAME} ${DROPBOX_CLI} version | sed -nre 's/Dropbox command-line interface version: (.+)/\1/p'`
+    # archive current cli
+    cp -fp ${DROPBOX_CLI} ${DROPBOX_ARCHIVE}/dropbox.${CUR_CLI_VERSION}.py
     break
   fi
 done
@@ -116,11 +158,13 @@ if [ -z "${DROPBOX_PID}" ]; then
 fi
 
 # set lansync
-if su-exec ${USER_NAME} ${USER_HOME}/bin/dropbox.py lansync ${LANSYNC}; then
+if su-exec ${USER_NAME} ${DROPBOX_CLI} lansync ${LANSYNC}; then
   echo -e "${C_GREEN}Set lancync mode to '${LANSYNC}${C_OFF}'"
 fi
 
 # Wait to terminate
+ps | awk '{print $1}' | grep -qE "^[ \t]*${DROPBOX_PID}$" \
+  && echo -e "${C_GREEN}Dropbox daemon started.${C_OFF}"
 while :; do
   sleep 5
   ps | awk '{print $1}' | grep -qE "^[ \t]*${DROPBOX_PID}$" || break;
