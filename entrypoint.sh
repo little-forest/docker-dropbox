@@ -1,7 +1,7 @@
-#!/bin/sh
+#!/bin/bash
 
-DAEMON_VERSION=86.4.146
-CLI_VERSION=2019.02.14
+DAEMON_VERSION=109.4.517
+CLI_VERSION=2020.03.04
 
 PREFERRED_DROPBOX_FILE=dropbox-lnx.x86_64-${DAEMON_VERSION}.tar.gz
 DROPBOX_DOWNLOAD_URL="https://clientupdates.dropboxstatic.com/dbx-releng/client/${PREFERRED_DROPBOX_FILE}"
@@ -45,7 +45,7 @@ dropbox_stop() {
   echo -e "${C_CYAN}Received $1${C_OFF}"
   echo -e "${C_CYAN}Terminating Dropbox daemon...${C_OFF}"
 
-  su-exec ${USER_NAME} ${USER_HOME}/bin/dropbox.py stop
+  ${EXEC} ${USER_NAME} ${USER_HOME}/bin/dropbox.py stop
   while :; do
     sleep 1
     ps | awk '{print $1}' | grep -qE "^[ \t]*${DROPBOX_PID}$" || break;
@@ -63,12 +63,16 @@ dropbox_stop() {
 
 [ -z "${GROUP_ID}" ] && warning "GROUP_ID is not defined. Use USER_ID(${USER_ID}) as GROUP_ID."
 
+which su-exec > /dev/null 2>&1 && EXEC=su-exec
+which gosu > /dev/null 2>&1 && EXEC=gosu
+[ -z $EXEC ] && fatal "Neither su-exec nor gosu are installed."
+
 USER_NAME=${DBOX_USER}
 GROUP_NAME=${USER_NAME}
 USER_HOME=/home/${USER_NAME}
 DROPBOX_ARCHIVE=${USER_HOME}/.dropbox/archive
 
-echo '--------------------------------------------------------------------------------'
+echo -e '--------------------------------------------------------------------------------'
 echo -e "${C_CYAN}Starting Docker-Dropbox with UID : ${USER_ID}, GID: ${GROUP_ID}${C_OFF}"
 echo -e "Prefered version : ${PREFERRED_DROPBOX_FILE} / ${CLI_VERSION}"
 
@@ -113,7 +117,7 @@ tar -C ${USER_HOME} -zxf ${DROPBOX_ARCHIVE_PATH}
 if [ -d ${USER_HOME}/.dropbox-dist ]; then
   echo -e "${C_CYAN}Dropbox version is `cat ${USER_HOME}/.dropbox-dist/VERSION`${C_OFF}"
 else
-  fatal "Unable to download dropboxd"
+  fatal "Failed to download dropboxd"
 fi
 
 # Prepare dropbox.py (dropbox cli)
@@ -136,7 +140,7 @@ chown -R ${USER_ID}:${GROUP_ID} ${DROPBOX_ARCHIVE}
 
 ## Execute Dropbox daemon
 echo -e "${C_CYAN}Starting dropbox daemon${C_OFF}"
-su-exec ${USER_NAME} ${USER_HOME}/.dropbox-dist/dropboxd &
+${EXEC} ${USER_NAME} ${USER_HOME}/.dropbox-dist/dropboxd &
 sleep 3
 
 # Check Dropbox daemon's pid
@@ -146,8 +150,8 @@ for T in 1 1 2 3 5 8 13 21 34 55; do
   if [ -f ${PID_FILE} ]; then
     DROPBOX_PID=`cat ${PID_FILE}`
     echo -e "${C_GREEN}Dropbox daemon detected. pid:${DROPBOX_PID}${C_OFF}"
-    su-exec ${USER_NAME} ${DROPBOX_CLI} version
-    CUR_CLI_VERSION=`su-exec ${USER_NAME} ${DROPBOX_CLI} version | sed -nre 's/Dropbox command-line interface version: (.+)/\1/p'`
+    ${EXEC} ${USER_NAME} ${DROPBOX_CLI} version
+    CUR_CLI_VERSION=`${EXEC} ${USER_NAME} ${DROPBOX_CLI} version | sed -nre 's/Dropbox command-line interface version: (.+)/\1/p'`
     # archive current cli
     cp -fp ${DROPBOX_CLI} ${DROPBOX_ARCHIVE}/dropbox.${CUR_CLI_VERSION}.py
     break
@@ -158,16 +162,17 @@ if [ -z "${DROPBOX_PID}" ]; then
 fi
 
 # set lansync
-if su-exec ${USER_NAME} ${DROPBOX_CLI} lansync ${LANSYNC}; then
+if ${EXEC} ${USER_NAME} ${DROPBOX_CLI} lansync ${LANSYNC}; then
   echo -e "${C_GREEN}Set lancync mode to '${LANSYNC}${C_OFF}'"
 fi
 
 # Wait to terminate
-ps | awk '{print $1}' | grep -qE "^[ \t]*${DROPBOX_PID}$" \
+ps aux | awk '{print $2}' | grep -qE "^[ \t]*${DROPBOX_PID}$" \
   && echo -e "${C_GREEN}Dropbox daemon started.${C_OFF}"
 while :; do
   sleep 5
-  ps | awk '{print $1}' | grep -qE "^[ \t]*${DROPBOX_PID}$" || break;
+  ps aux | awk '{print $2}' | grep -qE "^[ \t]*${DROPBOX_PID}$" || break;
+  echo
 done
 echo -e "${C_RED}Detected Dropbox daemon abnormally terminated.${C_OFF}"
 exit 1
