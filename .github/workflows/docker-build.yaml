@@ -35,8 +35,6 @@ jobs:
             echo "IMAGE_TAG=latest" >> $GITHUB_ENV
           fi
 
-      - run: echo "IMAGE_TAG=${IMAGE_TAG}"
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
