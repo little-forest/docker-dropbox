@@ -11,7 +11,7 @@ permissions:
   contents: 'read'
 
 jobs:
-  docker:
+  docker-build-and-push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
