@@ -17,6 +17,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Check paths
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - 'Dockerfile'
+              - 'dropbox'
+              - 'entrypoint.sh'
+
       - name: Set up image tag
         run: |
           if "${{ github.ref }}" =~ refs/tags/v.+; then
@@ -40,6 +50,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push
+        if: steps.changes.outputs.src == 'true'
         uses: docker/build-push-action@v4
         with:
           context: .
