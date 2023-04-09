@@ -16,7 +16,7 @@ $ mkdir ~/Dropbox ~/.dropbox
     -v ~/Dropbox:/home/dbox/Dropbox \
     -v ~/.dropbox:/home/dbox/.dropbox \
     -v /etc/localtime:/etc/localtime:ro \
-    littlef/dropbox
+    littlef/dropbox:1.1.4
 ```
 
 ### Environment variables
