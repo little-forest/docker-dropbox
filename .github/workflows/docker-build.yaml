@@ -17,32 +17,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - run: echo ${{ github.ref }}
+      - name: Set up image tag
+        run:
+          if "${{ guthub.ref }}" =~ refs/tags/v.+; then
+            echo "IMAGE_TAG=${REF##*/v}" >> $GITHUB_ENV
+          else
+            echo "IMAGE_TAG=latest" >> $GITHUB_ENV
+          fi
 
-      - name: test
-        # if: startsWith( github.ref, 'refs/tags/v' )
-        run: echo "REF=${{ github.ref }}" >> $GITHUB_ENV
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
 
-      - name: test2
-        run: echo ">>>${REF##*/}<<<"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      # - name: Set up QEMU
-      #   uses: docker/setup-qemu-action@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # - name: Set up Docker Buildx
-      #   uses: docker/setup-buildx-action@v2
-
-      # - name: Login to DockerHub
-      #   uses: docker/login-action@v2
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # - name: Build and push
-      #   uses: docker/build-push-action@v4
-      #   with:
-      #     context: .
-      #     platforms: linux/amd64,linux/arm64
-      #     push: true
-      #     tags: littlef/dropbox:dev
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: littlef/dropbox:${IMAGE_TAG}
 
