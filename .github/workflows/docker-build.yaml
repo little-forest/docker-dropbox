@@ -25,6 +25,8 @@ jobs:
             echo "IMAGE_TAG=latest" >> $GITHUB_ENV
           fi
 
+      - run: echo "IMAGE_TAG=${IMAGE_TAG}"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
@@ -43,5 +45,5 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: littlef/dropbox:${IMAGE_TAG}
+          tags: littlef/dropbox:${{ env.IMAGE_TAG }}
 
