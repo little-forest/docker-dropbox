@@ -35,5 +35,4 @@ fi
 ${EXEC} ${DBOX_USER} ${DBOX_HOME}/bin/dropbox.py $@
 exit $?
 
-#test
 # vim: ts=2 sw=2 sts=2 et nu foldmethod=marker
