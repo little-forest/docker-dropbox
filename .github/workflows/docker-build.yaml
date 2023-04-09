@@ -30,7 +30,7 @@ jobs:
       - name: Set up image tag
         run: |
           if [[ "${{ github.ref }}" =~ refs/tags/v.+ ]]; then
-            echo "IMAGE_TAG=${REF##*/v}" >> $GITHUB_ENV
+            echo "IMAGE_TAG=`sed -re 's|refs/tags/v||' <<<'${{ github.ref }}'`" >> $GITHUB_ENV
           else
             echo "IMAGE_TAG=latest" >> $GITHUB_ENV
           fi
