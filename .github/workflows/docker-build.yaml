@@ -19,7 +19,7 @@ jobs:
 
       - name: Set up image tag
         run:
-          if "${{ guthub.ref }}" =~ refs/tags/v.+; then
+          if "${{ github.ref }}" =~ refs/tags/v.+; then
             echo "IMAGE_TAG=${REF##*/v}" >> $GITHUB_ENV
           else
             echo "IMAGE_TAG=latest" >> $GITHUB_ENV
