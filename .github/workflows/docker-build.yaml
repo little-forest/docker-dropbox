@@ -47,6 +47,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - run: |
+          echo "filter: ${{ steps.changes.outputs.src }} / image-tag: ${{ env.IMAGE_TAG }} .. ${IMGAGE_TAG}"
+
       - name: Build and push
         if: steps.changes.outputs.src == 'true' || env.IMAGE_TAG != 'latest'
         uses: docker/build-push-action@v4
