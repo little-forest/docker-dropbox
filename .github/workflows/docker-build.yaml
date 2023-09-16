@@ -41,7 +41,7 @@ jobs:
 
       - name: Set up QEMU
         if: env.DO_BUILD == 'yes'
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         if: env.DO_BUILD == 'yes'
