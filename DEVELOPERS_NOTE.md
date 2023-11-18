@@ -45,3 +45,23 @@ DAEMON_VERSION=123.4.4832
 CLI_VERSION=2020.03.04
 ```
 
+# How to build locally
+
+Build image locally.
+
+```
+docker image build -t littlef/dropbox:dev .
+```
+
+Fix `/etc/systemd/system/dropbox@.service`.
+
+```
+Environment=DOCKER_NAME=littlef/dropbox:dev
+```
+
+Restart
+
+```
+sudo systemctl daemon-reload && sudo systemctl restart dropbox@USER_NAME.service
+```
+
