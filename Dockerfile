@@ -1,6 +1,6 @@
 FROM ubuntu:18.04
 
-MAINTAINER Yusuke KOMORI <komo@littleforest.jp>
+LABEL maintainer="Yusuke KOMORI"
 
 USER root
 
