@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check paths
-        uses: dorny/paths-filter@v2
+        uses: dorny/paths-filter@v3
         id: changes
         with:
           filters: |
